@@ -362,6 +362,36 @@ def test_to_dict_round_trip():
     assert restored.count(ItemStatus.PENDING) == 1
 
 
+def test_from_dict_without_next_id_avoids_id_collision():
+    # When the serialised payload omits next_id, the queue must resume IDs
+    # past the largest existing ID — never reusing one and clobbering an item.
+    data = {
+        "items": [
+            {"id": 5, "task": "a"},
+            {"id": 9, "task": "b"},
+        ],
+        "order": [5, 9],
+    }
+    q = WorkQueue.from_dict(data, clock=lambda: 0.0)
+    new = q.enqueue("c")
+    assert new.id == 10
+    assert new.id not in (5, 9)
+    assert len(q) == 3
+    assert q.get(5).task == "a"
+    assert q.get(9).task == "b"
+
+
+def test_from_dict_empty_without_next_id_starts_at_one():
+    q = WorkQueue.from_dict({}, clock=lambda: 0.0)
+    assert q.enqueue("first").id == 1
+
+
+def test_from_dict_respects_explicit_next_id():
+    data = {"items": [{"id": 1, "task": "a"}], "order": [1], "next_id": 50}
+    q = WorkQueue.from_dict(data, clock=lambda: 0.0)
+    assert q.enqueue("b").id == 50
+
+
 def test_repr():
     q = WorkQueue(clock=lambda: 0.0)
     q.enqueue("t")

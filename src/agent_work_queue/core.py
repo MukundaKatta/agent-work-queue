@@ -332,7 +332,10 @@ class WorkQueue:
             queue._items[item.id] = item
         default_order = [item.id for item in queue._items.values()]
         queue._order = list(data.get("order", default_order))
-        queue._next_id = int(data.get("next_id", len(queue._items) + 1))
+        # Default the next ID to one past the largest existing ID so that a
+        # subsequent enqueue never reuses (and silently overwrites) an ID.
+        next_after_max = max(queue._items, default=0) + 1
+        queue._next_id = int(data.get("next_id", next_after_max))
         return queue
 
     def __repr__(self) -> str:
